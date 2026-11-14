@@ -1,0 +1,80 @@
+name: GRT Collapse-Freedom Verification Suite
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  python-verify:
+    name: Python 3 Verification & Stress Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: "Run Part 1: Network Rank Preservation (Pure GRT)"
+        run: |
+          python python/verify_pure_grt.py
+
+      - name: "Run Part 2: Loss Anti-Collapse Dynamics (GRT-JEPA)"
+        run: |
+          python python/verify_grt_jepa.py
+
+      - name: Upload Proof Figure Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-figures
+          path: |
+            figures/figure1_network_rank_preservation.png
+            figures/figure_grt_model_manifolds.png
+            figures/figure2_loss_anticollapse_dynamics.png
+
+  octave-verify:
+    name: GNU Octave Numerical Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install GNU Octave
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y octave
+
+      - name: Run Octave Mathematical Verification
+        run: |
+          octave -q octave/verify_grt_collapse_freedom.m
+
+  lean-build:
+    name: Lean 4 Machine-Checked Formalization
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Elan (Lean Toolchain Manager)
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+      - name: Build and Verify Formal Theorems
+        working-directory: lean
+        run: |
+          lake update
+          lake exe cache get || true
+          lake build
+
